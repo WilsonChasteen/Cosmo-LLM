@@ -2,9 +2,14 @@
 # All rights reserved.
 
 import torch
+try:
+    torch.ops.load_library("torchvision")
+except Exception as e:
+    print("Warning: Could not load torchvision operators:", e)
+
 import torch.distributed
 import torch.optim as optim
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, QuantoConfig
 
 import wandb
 
@@ -43,11 +48,14 @@ def main():
     args = parser.parse_args()
 
     # init distributed environment
-    dist.init_process_group("nccl")
+    dist.init_process_group("gloo")
     local_rank = int(os.environ["LOCAL_RANK"])
     rank = int(os.environ["RANK"])
     world_size = int(os.environ["WORLD_SIZE"])
-    torch.cuda.set_device(local_rank)
+    if torch.cuda.is_available():
+        torch.cuda.set_device(local_rank)
+    else:
+        print("Warning: CUDA is not available; running on CPU")
 
     # load the configuration file
     with open(args.config_file) as f:
@@ -99,8 +107,8 @@ def main():
         print(
             f"Loading from {configs.load_model_path} and skip the first {configs.resume} epochs"
         )
-
-    model = AutoModelForCausalLM.from_pretrained(configs.model_id, trust_remote_code=True, low_cpu_mem_usage=True, torch_dtype=torch.float16, device_map="auto", load_in_4bit=True, max_memory= 11)
+    quant_config = QuantoConfig(weights="int4")
+    model = AutoModelForCausalLM.from_pretrained(configs.model_id, trust_remote_code=True, low_cpu_mem_usage=True, device_map="auto")
     tokenizer = AutoTokenizer.from_pretrained(configs.model_id)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.add_tokens("<|start-latent|>")
@@ -186,7 +194,7 @@ def main():
 
     else:
         parallel_model = FSDP(
-            model, auto_wrap_policy=llama_auto_wrap_policy, device_id=rank
+            model, auto_wrap_policy=llama_auto_wrap_policy, device_id=rank, use_orig_params=True
         )
 
     del model

@@ -17,8 +17,8 @@ pad_latent_to_max: True
 
 save_only_improve: False
 uniform_prob: 0.0
-model_id: deepseek-ai/deepseek-moe-16b-base
-load_model_path: null
+model_id: unsloth/Qwen2.5-7B-Instruct-bnb-4bit
+load_model_path: "None"
 seed: 43
 resume: 3
 bf16: False
