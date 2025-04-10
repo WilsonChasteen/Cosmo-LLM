@@ -1,5 +1,5 @@
 
-  project: coconut
+project: coconut
 save_path: YOUR_PATH_TO_SAVE_THE_MODEL
 name: gsm-coconut
 
